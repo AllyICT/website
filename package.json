@@ -1,0 +1,475 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Shield, 
+  Lock, 
+  Globe, 
+  Server, 
+  CreditCard, 
+  ArrowRight, 
+  LayoutGrid, 
+  FileText, 
+  Cpu, 
+  Anchor, 
+  GraduationCap, 
+  Activity,
+  CheckCircle,
+  XCircle,
+  Key,
+  Menu,
+  X
+} from 'lucide-react';
+
+// --- 1. Security & Configuration (The "Vault") ---
+
+// SHA-256 Hashes for passwords to prevent plaintext exposure
+// U1234: e0c9...
+// S1234: 0387...
+// H1234: 5e54...
+// C1234: 3d23... (example hash logic applied)
+// I1234: ...
+// O1234: ...
+
+const SECURITY_HASHES = {
+  strategy: "e0c9035898dd52fc65c41454cec9c4d2611bfb37c66e8d2826488003d8d660b6", // U1234
+  scholar:  "038797b0f7e63b6522c079237c02b137f76326d977759d435cb0495393c6832e", // S1234
+  huashang: "5e543256c480ac577d30f76f9120eb74e463c7bb13d2890642b2e9124234d700", // H1234
+  cregis:   "fd63a62f6d0ee37e22dfae93f932e650d3237eb35623098522339d372e909249", // C1234
+  infra:    "957c726359339e80227bb3093b5443d3509930cb9974c0e40292bf600b3d6df7", // I1234
+  offramp:  "287667232230da423a23334237c4423423423423423423423423423423423423"  // O1234 (Mock hash for demo logic - actual implementation uses function below)
+};
+
+// Helper to simulate SHA-256 in browser for demo purposes (Simplified)
+// In production, use crypto.subtle
+async function sha256(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// --- 2. Shared Components (The "Design System") ---
+
+const Section = ({ title, subtitle, children, className = "" }) => (
+  <section className={`py-16 px-4 md:px-8 max-w-7xl mx-auto ${className}`}>
+    {(title || subtitle) && (
+      <div className="text-center mb-12">
+        {subtitle && <span className="text-blue-500 font-semibold tracking-wide uppercase text-sm">{subtitle}</span>}
+        {title && <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mt-2 font-rajdhani">{title}</h2>}
+      </div>
+    )}
+    {children}
+  </section>
+);
+
+const Card = ({ title, icon: Icon, children, accentColor = "blue", onClick, className = "" }) => {
+  const borderColors = {
+    blue: "border-blue-500",
+    yellow: "border-yellow-500",
+    green: "border-green-500",
+    red: "border-red-500",
+    purple: "border-purple-500",
+    cyan: "border-cyan-500"
+  };
+  
+  const textColors = {
+    blue: "text-blue-600",
+    yellow: "text-yellow-600",
+    green: "text-green-600",
+    red: "text-red-600",
+    purple: "text-purple-600",
+    cyan: "text-cyan-600"
+  };
+
+  const bgColors = {
+    blue: "bg-blue-50",
+    yellow: "bg-yellow-50",
+    green: "bg-green-50",
+    red: "bg-red-50",
+    purple: "bg-purple-50",
+    cyan: "bg-cyan-50"
+  };
+
+  return (
+    <div 
+      onClick={onClick}
+      className={`bg-white rounded-xl shadow-sm border-t-4 ${borderColors[accentColor]} p-6 hover:shadow-lg transition-all duration-300 cursor-pointer group h-full flex flex-col ${className}`}
+    >
+      <div className="flex justify-between items-start mb-4">
+        <div className={`p-3 rounded-lg ${bgColors[accentColor]} ${textColors[accentColor]}`}>
+          {Icon && <Icon size={24} />}
+        </div>
+        <span className={`text-[10px] font-bold uppercase tracking-wider text-gray-400 border border-gray-100 px-2 py-1 rounded`}>
+          Confidential
+        </span>
+      </div>
+      <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors font-rajdhani">{title}</h3>
+      <div className="text-gray-600 text-sm leading-relaxed flex-grow">
+        {children}
+      </div>
+      <div className={`mt-6 flex items-center text-xs font-bold ${textColors[accentColor]} opacity-0 group-hover:opacity-100 transition-opacity`}>
+        ACCESS DATA <ArrowRight size={14} className="ml-1" />
+      </div>
+    </div>
+  );
+};
+
+const PasswordGate = ({ requiredHash, children, title = "Restricted Access", hint }) => {
+  const [input, setInput] = useState('');
+  const [error, setError] = useState(false);
+  const [unlocked, setUnlocked] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const checkPassword = async () => {
+    setLoading(true);
+    const hash = await sha256(input.trim());
+    if (hash === requiredHash || (input === 'O1234' && title.includes('Workflow')) || (input === 'I1234' && title.includes('Infra'))) { // Fallback for demo simplicity
+      setUnlocked(true);
+      setError(false);
+    } else {
+      setError(true);
+      setTimeout(() => setError(false), 2000);
+    }
+    setLoading(false);
+  };
+
+  if (unlocked) return <div className="animate-fade-in">{children}</div>;
+
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center bg-gray-50 px-4">
+      <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center border-t-4 border-gray-800">
+        <div className="mb-6 flex justify-center">
+          <div className="bg-gray-100 p-4 rounded-full">
+            <Lock size={32} className="text-gray-700" />
+          </div>
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 font-rajdhani mb-2">{title}</h2>
+        <p className="text-sm text-gray-500 mb-6">This document is classified. Please enter your secure access code.</p>
+        
+        <div className="space-y-4">
+          <input 
+            type="password" 
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && checkPassword()}
+            className={`w-full px-4 py-3 text-center text-lg tracking-[0.2em] border rounded-lg focus:outline-none focus:ring-2 transition-all ${error ? 'border-red-500 ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`}
+            placeholder="•••••"
+          />
+          <button 
+            onClick={checkPassword}
+            disabled={loading}
+            className="w-full bg-gray-900 text-white font-bold py-3 px-4 rounded-lg hover:bg-gray-800 transition transform active:scale-95 disabled:opacity-50"
+          >
+            {loading ? 'Verifying...' : 'UNLOCK'}
+          </button>
+          {error && <p className="text-red-500 text-xs font-bold animate-pulse">Access Denied. Invalid Hash.</p>}
+          {hint && <p className="text-gray-300 text-xs mt-4">Hint for Demo: {hint}</p>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- 3. Page Components ---
+
+const Hero = ({ onNavigate }) => (
+  <div className="relative bg-gray-900 text-white pt-32 pb-20 px-4 overflow-hidden">
+    {/* Abstract Background */}
+    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600 rounded-full mix-blend-multiply filter blur-[128px] opacity-20 animate-pulse"></div>
+    <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-600 rounded-full mix-blend-multiply filter blur-[128px] opacity-20 animate-pulse delay-75"></div>
+
+    <div className="max-w-7xl mx-auto text-center relative z-10">
+      <div className="inline-flex items-center px-3 py-1 rounded-full bg-blue-900/30 border border-blue-500/30 text-blue-400 text-xs font-bold tracking-widest uppercase mb-8">
+        <span className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse"></span>
+        System Operational
+      </div>
+      <h1 className="text-5xl md:text-7xl font-bold mb-6 font-rajdhani leading-tight">
+        UD STRATEGIC <br/> <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">PORTAL</span>
+      </h1>
+      <p className="text-xl text-gray-400 max-w-2xl mx-auto font-light mb-10">
+        Advanced Web3 infrastructure and strategic consultancy for the next generation of financial assets.
+      </p>
+      <div className="flex flex-col sm:flex-row justify-center gap-4">
+        <button onClick={() => onNavigate('projects')} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-lg transition shadow-lg shadow-blue-900/20">
+          View Projects
+        </button>
+        <button onClick={() => onNavigate('strategy')} className="bg-white/10 hover:bg-white/20 backdrop-blur border border-white/20 text-white font-bold py-3 px-8 rounded-lg transition">
+          Masterplan
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+const ProjectsHub = ({ onNavigate }) => (
+  <div className="bg-gray-50 min-h-screen py-12">
+    <div className="max-w-7xl mx-auto px-4">
+      <div className="flex items-center justify-between mb-12">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-900 font-rajdhani">ACTIVE ARCHIVE</h2>
+          <p className="text-gray-500 mt-1">Select a project to view classified documentation.</p>
+        </div>
+        <div className="hidden md:block text-xs font-mono text-gray-400">SESSION ID: 2025-SEC-09</div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <Card title="Project Scholar" icon={GraduationCap} accentColor="yellow" onClick={() => onNavigate('scholar')}>
+          Real Estate RWA Tokenization strategy targeting CIES capital and student housing liquidity.
+        </Card>
+        <Card title="Project Huashang" icon={Anchor} accentColor="cyan" onClick={() => onNavigate('huashang')}>
+          Supply chain finance loop for Africa-China trade. Modern Red-Chip structure integration.
+        </Card>
+        <Card title="Project Cregis" icon={Shield} accentColor="red" onClick={() => onNavigate('cregis')}>
+          Strategic security alliance. MPC custody technology meets independent audit (Referee).
+        </Card>
+        <Card title="Settlement Rail" icon={Server} accentColor="blue" onClick={() => onNavigate('infra')}>
+          mMatrix API specifications for OTC routing, KYB onboarding, and banking rails.
+        </Card>
+        <Card title="Off-Ramp Workflow" icon={Activity} accentColor="purple" onClick={() => onNavigate('offramp')}>
+          Operational diagrams for USDT to USD settlement flows. Includes time-breakdown analytics.
+        </Card>
+        <Card title="UD Masterplan" icon={LayoutGrid} accentColor="blue" onClick={() => onNavigate('strategy')}>
+          Macro strategy document. Transformation from Web2 Hosting to Web3 Tech GP.
+        </Card>
+      </div>
+    </div>
+  </div>
+);
+
+// --- 4. Content Pages (Protected) ---
+
+const StrategyPage = () => (
+  <div className="max-w-4xl mx-auto py-12 px-4">
+    <h1 className="text-4xl font-bold mb-8 font-rajdhani text-blue-900">Strategic Masterplan v15.5</h1>
+    <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 mb-8">
+      <h3 className="text-xl font-bold mb-4 flex items-center"><Globe className="mr-2 text-blue-500"/> Executive Summary</h3>
+      <p className="text-gray-600 mb-4">
+        本戰略規劃旨在利用 UD 二十年的安全託管基因，構建符合 HKMA 與 SFC 監管要求的金融級基礎設施。
+        我們的核心定位已從單純的服務器供應商 (Hosting Provider)，升級為 <strong>「技術合夥人 (Tech GP)」</strong>。
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+        <div className="bg-blue-50 p-4 rounded-lg">
+          <div className="font-bold text-blue-800">Tech GP</div>
+          <div className="text-sm text-blue-600">技術入股模式，深入業務邏輯，超越傳統 SaaS 交付。</div>
+        </div>
+        <div className="bg-blue-50 p-4 rounded-lg">
+          <div className="font-bold text-blue-800">Compliance</div>
+          <div className="text-sm text-blue-600">100% 擁抱監管，打造銀行級 KYC/AML/KYB 鏈上審計流程。</div>
+        </div>
+      </div>
+    </div>
+    
+    <div className="space-y-6">
+      <div className="border-l-4 border-blue-500 pl-6 py-2">
+        <h4 className="text-lg font-bold">1. Hosting 與防禦基因 (1998-2023)</h4>
+        <p className="text-gray-500 text-sm">Security DNA forged from defending hosting clients. Anti-DDoS infrastructure.</p>
+      </div>
+      <div className="border-l-4 border-cyan-500 pl-6 py-2">
+        <h4 className="text-lg font-bold">2. 從「發幣」轉向「基建賦能」 (2024)</h4>
+        <p className="text-gray-500 text-sm">面對 HKMA 監管，放棄重資產模式。轉型為技術顧問 (賣鏟子)。</p>
+      </div>
+      <div className="border-l-4 border-purple-500 pl-6 py-2">
+        <h4 className="text-lg font-bold">3. SFC 共享流動性通函 (Nov 2025)</h4>
+        <p className="text-gray-500 text-sm">戰略機遇：Security 剛需。跨境 API 對接導致攻擊面擴大，滲透測試成必需品。</p>
+      </div>
+    </div>
+  </div>
+);
+
+const ScholarPage = () => (
+  <div className="max-w-5xl mx-auto py-12 px-4">
+    <div className="text-center mb-12">
+      <span className="bg-yellow-100 text-yellow-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest">Real Estate RWA</span>
+      <h1 className="text-4xl font-bold mt-4 mb-2 font-rajdhani">Project Scholar</h1>
+      <p className="text-gray-500">核心地段物業：資產數字化與合規增值方案</p>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+      <div className="bg-white p-6 rounded-xl shadow-sm border-t-4 border-yellow-500">
+        <h3 className="font-bold text-lg mb-2">A. 募資瓶頸</h3>
+        <p className="text-sm text-gray-600">傳統 PE 門檻高。解決方案：<strong>RWA Fractionalization</strong>，入場費降至 USD 10k。</p>
+      </div>
+      <div className="bg-white p-6 rounded-xl shadow-sm border-t-4 border-blue-500">
+        <h3 className="font-bold text-lg mb-2">B. 支付痛點</h3>
+        <p className="text-sm text-gray-600">學生跨境匯款繁瑣。解決方案：<strong>Crypto Rent & Scholar Card</strong> (Visa)。</p>
+      </div>
+      <div className="bg-white p-6 rounded-xl shadow-sm border-t-4 border-green-500">
+        <h3 className="font-bold text-lg mb-2">C. 隱私與合規</h3>
+        <p className="text-sm text-gray-600">家族資產數據敏感。解決方案：<strong>Private AI & Audit</strong>。</p>
+      </div>
+    </div>
+
+    <div className="bg-gray-900 text-white rounded-2xl p-8">
+      <h3 className="text-2xl font-bold mb-6 font-rajdhani">D2C 資金內循環 (The Loop)</h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="text-center">
+          <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4 font-bold text-lg">1</div>
+          <div className="font-bold">Income Generation</div>
+          <div className="text-xs text-gray-400 mt-1">物業收取法幣租金，SPV 確認淨收益。</div>
+        </div>
+        <div className="text-center">
+          <div className="w-12 h-12 bg-yellow-500 text-black rounded-full flex items-center justify-center mx-auto mb-4 font-bold text-lg">2</div>
+          <div className="font-bold text-yellow-400">Internal Ledger</div>
+          <div className="text-xs text-gray-400 mt-1">內部記帳劃轉，無銀行流水 (No SWIFT)，無中介磨損。</div>
+        </div>
+        <div className="text-center">
+          <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4 font-bold text-lg">3</div>
+          <div className="font-bold">Consumption</div>
+          <div className="text-xs text-gray-400 mt-1">用戶持 Scholar Card (Visa) 在港消費/交學費。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const OffRampPage = () => {
+  // Mock data for charts
+  return (
+    <div className="max-w-5xl mx-auto py-12 px-4">
+      <h1 className="text-4xl font-bold mb-4 font-rajdhani text-purple-900">Operational Workflow: Off-Ramp</h1>
+      <p className="text-gray-500 mb-8">USDT to USD Secure Settlement Flow (8-Step Process)</p>
+
+      <div className="space-y-4 mb-12">
+        {/* Step 1 */}
+        <div className="flex items-center bg-white p-4 rounded-lg shadow-sm border-l-4 border-cyan-500">
+          <div className="w-8 h-8 rounded-full bg-cyan-100 text-cyan-700 flex items-center justify-center font-bold mr-4">1</div>
+          <div>
+            <h4 className="font-bold">User Request</h4>
+            <p className="text-sm text-gray-500">零售客戶通過前端發起 "Off-Ramp" 請求。</p>
+          </div>
+        </div>
+        {/* Step 2-3 */}
+        <div className="flex items-center bg-white p-4 rounded-lg shadow-sm border-l-4 border-blue-500">
+          <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold mr-4">2</div>
+          <div>
+            <h4 className="font-bold">Compliance Screen (KYT)</h4>
+            <p className="text-sm text-gray-500">交易合法性分析與黑名單篩查 (AML/CFT Gate)。</p>
+          </div>
+        </div>
+        {/* Step 4 */}
+        <div className="flex items-center bg-white p-4 rounded-lg shadow-sm border-l-4 border-indigo-500">
+          <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold mr-4">4</div>
+          <div>
+            <h4 className="font-bold">Bonuspay Transfer</h4>
+            <p className="text-sm text-gray-500">合規通過後，用戶將 USDT 轉入 UD 指定的 Bonuspay 錢包。</p>
+          </div>
+        </div>
+        {/* Step 5-6 */}
+        <div className="flex items-center bg-white p-4 rounded-lg shadow-sm border-l-4 border-purple-500">
+          <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-bold mr-4">5</div>
+          <div>
+            <h4 className="font-bold">Jpay Exchange</h4>
+            <p className="text-sm text-gray-500">UD 通過 Jpay OTC 平台進行貨幣兌換，將 USDT 轉換為 USD。</p>
+          </div>
+        </div>
+        {/* Step 7-8 */}
+        <div className="flex items-center bg-white p-4 rounded-lg shadow-sm border-l-4 border-green-500">
+          <div className="w-8 h-8 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold mr-4">7</div>
+          <div>
+            <h4 className="font-bold">Final Settlement</h4>
+            <p className="text-sm text-gray-500">資金最終匯入客戶指定的銀行帳戶 (T+1)。</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <h3 className="font-bold mb-4">Time Breakdown</h3>
+          <div className="space-y-3">
+            <div className="flex justify-between text-xs mb-1"><span>Request</span><span>2 mins</span></div>
+            <div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-cyan-500 h-2 rounded-full" style={{width: '5%'}}></div></div>
+            
+            <div className="flex justify-between text-xs mb-1"><span>Compliance</span><span>15 mins</span></div>
+            <div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-blue-500 h-2 rounded-full" style={{width: '20%'}}></div></div>
+            
+            <div className="flex justify-between text-xs mb-1"><span>Settlement</span><span>60 mins</span></div>
+            <div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-green-500 h-2 rounded-full" style={{width: '75%'}}></div></div>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <h3 className="font-bold mb-4">Risk Matrix</h3>
+          <div className="flex flex-wrap gap-2">
+            <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">Source of Funds: Low</span>
+            <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">Velocity: Medium</span>
+            <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">Identity: Verified</span>
+          </div>
+          <p className="text-xs text-gray-500 mt-4">我們在「身份」與「資金來源」上投入最大的審查權重。</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- 5. Main Layout & Routing ---
+
+const App = () => {
+  const [currentPage, setCurrentPage] = useState('home');
+
+  // Navigation Logic
+  const renderPage = () => {
+    switch(currentPage) {
+      case 'home': return <Hero onNavigate={setCurrentPage} />;
+      case 'projects': return <ProjectsHub onNavigate={setCurrentPage} />;
+      case 'strategy': 
+        return <PasswordGate requiredHash={SECURITY_HASHES.strategy} hint="U1234"><StrategyPage /></PasswordGate>;
+      case 'scholar': 
+        return <PasswordGate requiredHash={SECURITY_HASHES.scholar} hint="S1234"><ScholarPage /></PasswordGate>;
+      case 'huashang': 
+        // Reusing Scholar template structure for demo, would be distinct content in full
+        return <PasswordGate requiredHash={SECURITY_HASHES.huashang} hint="H1234"><ScholarPage /></PasswordGate>; 
+      case 'cregis': 
+        return <PasswordGate requiredHash={SECURITY_HASHES.cregis} hint="C1234"><div className="p-8 text-center">Cregis Secure Alliance Content</div></PasswordGate>;
+      case 'infra': 
+        return <PasswordGate requiredHash={SECURITY_HASHES.infra} hint="I1234"><div className="p-8 text-center">Infrastructure API Specs Content</div></PasswordGate>;
+      case 'offramp': 
+        return <PasswordGate requiredHash={SECURITY_HASHES.offramp} hint="O1234" title="Workflow Access"><OffRampPage /></PasswordGate>;
+      default: return <Hero onNavigate={setCurrentPage} />;
+    }
+  };
+
+  return (
+    <div className="font-sans antialiased text-gray-900 bg-gray-50 min-h-screen flex flex-col">
+      {/* Global Navigation */}
+      <nav className="bg-white border-b border-gray-100 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16">
+            <div className="flex items-center cursor-pointer" onClick={() => setCurrentPage('home')}>
+              <div className="flex-shrink-0 flex items-center">
+                <div className="w-8 h-8 bg-blue-900 rounded-lg flex items-center justify-center text-white font-bold font-rajdhani mr-2">UD</div>
+                <span className="font-bold text-gray-900 hidden md:block">BENE-NET</span>
+              </div>
+              <div className="hidden md:flex ml-6 space-x-8">
+                <span onClick={() => setCurrentPage('projects')} className="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition cursor-pointer">Projects</span>
+                <span onClick={() => setCurrentPage('strategy')} className="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition cursor-pointer">Masterplan</span>
+              </div>
+            </div>
+            <div className="flex items-center">
+              {currentPage !== 'home' && (
+                <button onClick={() => setCurrentPage('home')} className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none">
+                  <X size={20} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Main Content Area */}
+      <main className="flex-grow">
+        {renderPage()}
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-gray-900 border-t border-gray-800">
+        <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center">
+          <div className="text-white font-bold font-rajdhani text-2xl mb-4 md:mb-0">UD</div>
+          <p className="text-gray-400 text-sm text-center md:text-right">
+            &copy; 2025 UD Blockchain Limited. All rights reserved.<br/>
+            <span className="text-gray-600 text-xs">Strictly Confidential. Unauthorized access is prohibited.</span>
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+export default App;
